@@ -5,15 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SatisFunction Survey</title>
 
-  <!-- SurveyJS CSS + JS (note the .core. in the filename) -->
+  <!-- SurveyJS runtime (theme CSS + core + KO renderer) -->
   <link rel="stylesheet" href="https://unpkg.com/survey-core/defaultV2.min.css">
-  <script src="https://unpkg.com/survey-core/survey.core.iife.min.js" defer></script>
+  <script src="https://unpkg.com/survey-core/survey.core.iife.min.js"></script>
+  <script src="https://unpkg.com/knockout/build/output/knockout-latest.js"></script>
+  <script src="https://unpkg.com/survey-knockout-ui/survey-knockout-ui.iife.min.js"></script>
 
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f6f2e8; margin:0; }
     .wrap { max-width: 900px; margin: 40px auto; padding: 0 16px; }
-    h1 { font-size: 2rem; margin: 0 0 12px; }
-    #err { color:#b00020; margin: 8px 0 0; display:none; }
+    h1 { font-size: 2rem; margin: 0 0 20px; }
+    #err { color:#b00020; margin: 12px 0 0; display:none; }
   </style>
 </head>
 <body>
@@ -23,30 +25,813 @@
     <div id="surveyContainer"></div>
   </div>
 
-  <script defer>
-    window.addEventListener("DOMContentLoaded", function () {
-      const err = document.getElementById("err");
+  <script>
+    // Theme
+    Survey.StylesManager.applyTheme("defaultV2");
 
-      // Sanity check: did the library load?
+    // ====== PUBLIC / PRIVATE toggle ======
+    // Set to "" for public (no prompt). Set to any non-empty string for private.
+    const PASSCODE = ""; // e.g. "AUGS2025" to require a code
+
+    // Optional per-site tag: use URL like ?site=ClinicA
+    const params   = new URLSearchParams(location.search);
+    const siteTag  = params.get("site") || "";
+
+    // ====== YOUR SURVEY JSON ======
+    const surveyJson = {
+  "title": "SatisFunction Survey ",
+  "description": "Sexual Function and Satisfaction Post-Vaginoplasty\n\nPurpose:\nThis survey helps you (and your clinician) understand your current sexual function and satisfaction after surgery or other treatments. It is not a research study-your responses are used only to guide your care.\n\nHow to Complete:\n- Answer each question based on your experiences in the past 4 weeks.\n- Select the answer that best matches your experience or feelings.\n- If a question does not apply to you (for example, if you do not have a vaginal canal), choose \"N/A\".\n- If you are unsure or prefer not to answer a question, choose \"I don't know / Prefer not to answer\".\n\nThere are no right or wrong answers-please answer honestly.\n\nScoring:\nYour responses are scored to help identify areas where you may be experiencing challenges or improvements. A higher score generally reflects better sexual function and satisfaction. Your clinician will review the results with you.\n\nPrivacy:\nYour answers are confidential and are not stored in a research database. Results are for your clinical care only.",
+  "pages": [
+    {
+      "name": "page1",
+      "title": "SURGICAL HISTORY",
+      "elements": [
+        {
+          "type": "radiogroup",
+          "name": "vaginoplastytype_v2_v3_v2_v2_v2",
+          "title": "What type of vaginoplasty did you receive?\n",
+          "isRequired": true,
+          "choices": [
+            { "value": "1", "text": "Zero Depth/Vulvoplasty" },
+            { "value": "2", "text": "Shallow Depth" },
+            { "value": "3", "text": "Penile Inversion" },
+            { "value": "4", "text": "Peritoneal Pull Through" },
+            { "value": "5", "text": "Intestinal/Colon" },
+            { "value": "6", "text": "Other" },
+            { "value": "7", "text": "I'm Not Sure" },
+            { "value": "8", "text": "Prefer not to answer" }
+          ]
+        },
+        {
+          "type": "text",
+          "name": "vaginoplastytype3_v3_v2_v2_v2",
+          "visibleIf": "{vaginoplastytype_v2_v3_v2_v2_v2} = '6'",
+          "title": "If other, please specify"
+        },
+        {
+          "type": "checkbox",
+          "name": "surgeries_v3_v2_v2_v2",
+          "title": "Please select any revision procedures you have had after your initial procedure\n\n(Check All That Apply)",
+          "isRequired": true,
+          "choices": [
+            { "value": "1", "text": "Vulvoplasty" },
+            { "value": "2", "text": "Subsequent Penile Inversion" },
+            { "value": "3", "text": "Subsequent Peritoneal Pull Through" },
+            { "value": "4", "text": "Intestinal/Colon" },
+            { "value": "5", "text": "Scar Revision" },
+            { "value": "6", "text": "Deepening procedure" },
+            { "value": "7", "text": "Other" },
+            { "value": "8", "text": "I'm Not Sure" },
+            { "value": "9", "text": "None" },
+            { "value": "10", "text": "Prefer not to answer" }
+          ]
+        },
+        {
+          "type": "text",
+          "name": "revision_other_v3_v2_v2_v2",
+          "visibleIf": "[surgeries_v3_v2_v2_v2(7)] = '1'",
+          "title": "If other, please specify"
+        },
+        {
+          "type": "text",
+          "name": "please_indicate_the_month_v2",
+          "title": "Please indicate the approximate month and year of your most recent vaginoplasty.\n\n(If you have had a revision that involved creating or recreating a vaginal canal - not a scar revision or labiaplasty - use the date of that most recent revision instead. If you are unsure of the exact month, please provide your best estimate.)\n",
+          "isRequired": true,
+          "inputType": "date"
+        },
+        {
+          "type": "radiogroup",
+          "name": "do_you_currently_have_a_va_v2",
+          "title": "Do you currently have a vaginal canal?",
+          "isRequired": true,
+          "choices": [
+            { "value": "1", "text": "Yes" },
+            { "value": "0", "text": "No" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "page2",
+      "title": "SatisFunction Survey",
+      "elements": [
+        {
+          "type": "html",
+          "name": "instr_v2",
+          "html": "<p><strong><div class=\\\"rich-text-field-label\\\"><p><span style=\\\"font-weight: normal;\\\">This survey is designed to assess your </span><span style=\\\"text-decoration: underline;\\\">sexual satisfaction and function following vaginoplasty</span><span style=\\\"font-weight: normal;\\\">. It includes questions about a range of experiences related to both sexual and non-sexual activity. To begin, please indicate which type of vaginoplasty you received and, if applicable, whether you have undergone any revision procedures.</span><br><br><span style=\\\"font-weight: normal;\\\">Sexual activity includes oral sex, penetrative sex, masturbation, sex toy use, etc. (alone or with partner(s))</span><br><br><span style=\\\"font-weight: normal;\\\">Non-sexual activity includes dilator use, in-office vaginal or pelvic exams, speculum exams, etc.</span><br><br><span style=\\\"font-weight: normal;\\\">Please answer the following questions based on your experiences </span><span style=\\\"text-decoration: underline;\\\">over the past 4 weeks.</span><br><br><span style=\\\"font-weight: normal;\\\"></span></p><p> </p><p><span style=\\\"font-weight: normal;\\\">NOTE:</span><br><span style=\\\"font-weight: normal;\\\">If you do not have a vaginal canal, or selected a zero-depth or shallow-depth vaginoplasty, canal-specific questions will be automatically omitted.</span></p><p><span style=\\\"font-weight: normal;\\\"></span><br><br><span style=\\\"font-weight: normal;\\\">If you are completing this survey on paper, please skip the following canal-specific questions: Q14, Q18, Q19, Q21, Q22, Q33, and Q34.</span></p></div></strong></p>"
+        },
+        {
+          "type": "panel",
+          "name": "panel1",
+          "title": "Genital Self-Image\n",
+          "elements": [
+            {
+              "type": "radiogroup",
+              "name": "how1_omfortable_are_you_wi_v2_v2",
+              "title": "1. How comfortable are you with the physical appearance of your external genitalia?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very comfortable" },
+                { "value": "1", "text": "Slightly comfortable" },
+                { "value": "0", "text": "Neutral" },
+                { "value": "-1", "text": "Slightly uncomfortable" },
+                { "value": "-2", "text": "Very uncomfortable" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how2_cmfortable_do_you_or_v2_v2",
+              "title": "2. How comfortable do you or would you feel with your partner(s) seeing your external genitalia?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very comfortable" },
+                { "value": "1", "text": "Slightly comfortable" },
+                { "value": "0", "text": "Neutral" },
+                { "value": "-1", "text": "Slightly uncomfortable" },
+                { "value": "-2", "text": "Very uncomfortable" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_often_does_scarring_in_v2",
+              "title": "3. How often does scarring interfere with how comfortable you are with the physical appearance of your external genitalia?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Never" },
+                { "value": "1", "text": "Almost never" },
+                { "value": "0", "text": "Sometimes" },
+                { "value": "-1", "text": "Almost always" },
+                { "value": "-2", "text": "Always" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "compared_to_before_your_pr_v2",
+              "title": "4. Compared to before your procedure, rate your gender dysphoria in relation to your genitalia. \n\n(gender dysphoria means discomfort or stress related to gender)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Much lower or absent" },
+                { "value": "1", "text": "Lower" },
+                { "value": "0", "text": "The same" },
+                { "value": "-1", "text": "Higher" },
+                { "value": "-2", "text": "Much higher" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "name": "panel2",
+          "title": "Desire",
+          "elements": [
+            {
+              "type": "radiogroup",
+              "name": "how_often_do_you_feel_sexu_v2",
+              "title": "5. How often do you feel sexual desire?   \n\n(the feeling of wanting a sexual experience, feeling receptive to a partner's sexual initiation, or fantasizing about having sex)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Always" },
+                { "value": "1", "text": "Almost always" },
+                { "value": "0", "text": "Sometimes" },
+                { "value": "-1", "text": "Almost never" },
+                { "value": "-2", "text": "Never" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "ho_satisfied_are_you_with_v2_v2",
+              "title": "6. How satisfied are you with your level of sexual desire?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "name": "panel3",
+          "title": "Arousal",
+          "elements": [
+            {
+              "type": "radiogroup",
+              "name": "how_satified_are_you_with_v2_v2",
+              "title": "7. How satisfied are you with the frequency of your sexual arousal?  \n\n(the mental/physical feelings of sexual excitement, warmth or tingling in the genitals, muscle contractions)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_woud_you_rate_the_int_v2_v2",
+              "title": "8. How would you rate the intensity of your sexual arousal?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very high" },
+                { "value": "1", "text": "High" },
+                { "value": "0", "text": "Not too high, Not too low" },
+                { "value": "-1", "text": "Low" },
+                { "value": "-2", "text": "Very low or absent" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_saisfied_are_you_with_v2_v2",
+              "title": "9. How satisfied are you with the intensity of your sexual arousal?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "name": "panel4",
+          "title": "Lubrication",
+          "elements": [
+            {
+              "type": "radiogroup",
+              "name": "how_often_o_you_feel_secr_v2_v2",
+              "title": "10. How often do you feel secretions during sexual activity or intercourse without using lubricants?  \n\n(engaging in sexual activity alone or with a partner)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Always" },
+                { "value": "1", "text": "Almost always" },
+                { "value": "0", "text": "Sometimes" },
+                { "value": "-1", "text": "Almost never" },
+                { "value": "-2", "text": "Never" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_oftn_do_you_feel_unwa_v2_v2",
+              "title": "11. How often do you feel unwanted secretions outside of sexual activity or intercourse?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Never" },
+                { "value": "1", "text": "Almost never" },
+                { "value": "0", "text": "Sometimes" },
+                { "value": "-1", "text": "Almost always" },
+                { "value": "-2", "text": "Always" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "name": "panel5",
+          "title": "Orgasm",
+          "elements": [
+            {
+              "type": "radiogroup",
+              "name": "how_ofen_have_you_been_ab_v2_v2",
+              "title": "12. How often have you been able to have an orgasm when you wanted to?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Always" },
+                { "value": "1", "text": "Almost always" },
+                { "value": "0", "text": "Sometimes" },
+                { "value": "-1", "text": "Almost never" },
+                { "value": "-2", "text": "Never" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_stisfied_do_you_feel_v2_v2",
+              "title": "13. How satisfied do you feel with the quality of your orgasm during sexual stimulation and/or intercourse?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_oftn_have_you_been_ab_v2_v2",
+              "visibleIf": "{do_you_currently_have_a_va_v2} = 1",
+              "title": "14. How often have you been able to achieve an orgasm with vaginal penetration?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Always" },
+                { "value": "1", "text": "Almost always" },
+                { "value": "0", "text": "Sometimes" },
+                { "value": "-1", "text": "Almost never" },
+                { "value": "-2", "text": "Never" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_otn_have_you_been_ab_v2_v2",
+              "title": "15. How often have you been able to achieve an orgasm with clitoral stimulation?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Always" },
+                { "value": "1", "text": "Almost always" },
+                { "value": "0", "text": "Sometimes" },
+                { "value": "-1", "text": "Almost never" },
+                { "value": "-2", "text": "Never" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_ofn_have_you_been_ab_v2_v2",
+              "title": "16. How often have you been able to achieve an orgasm with anal penetration?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Always" },
+                { "value": "1", "text": "Almost always" },
+                { "value": "0", "text": "Sometimes" },
+                { "value": "-1", "text": "Almost never" },
+                { "value": "-2", "text": "Never" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "name": "panel6",
+          "title": "Satisfaction",
+          "elements": [
+            {
+              "type": "radiogroup",
+              "name": "how_stisfied_are_you_with_v2_v2",
+              "title": "17. How satisfied are you with the amount of sexual activity you have?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_sisfied_are_you_with_v2_v2",
+              "visibleIf": "{do_you_currently_have_a_va_v2} = 1",
+              "title": "18. How satisfied are you with the feeling of vaginal penetration?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_stfied_are_you_with_v2_v2",
+              "visibleIf": "{do_you_currently_have_a_va_v2} = 1",
+              "title": "19. How satisfied are you with the depth of your vagina?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_safied_are_you_with_v2_v2",
+              "title": "20. How satisfied are you with the circumference of your vagina?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "name": "panel7",
+          "title": "Pain",
+          "elements": [
+            {
+              "type": "radiogroup",
+              "name": "how_ofn_do_you_experienc_v2_v2",
+              "visibleIf": "{do_you_currently_have_a_va_v2} = 1",
+              "title": "21. How often do you experience pain during vaginal penetration?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Never" },
+                { "value": "1", "text": "Almost never" },
+                { "value": "0", "text": "Sometimes" },
+                { "value": "-1", "text": "Almost always" },
+                { "value": "-2", "text": "Always" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_wld_you_rate_the_int_v2_v2",
+              "visibleIf": "{do_you_currently_have_a_va_v2} = 1",
+              "title": "22. How would you rate the intensity of pain you experience during vaginal penetration?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very low or absent" },
+                { "value": "1", "text": "Low" },
+                { "value": "0", "text": "Not too high, Not too low" },
+                { "value": "-1", "text": "High" },
+                { "value": "-2", "text": "Very high" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_on_do_you_experienc_v2_v2",
+              "title": "23. How often do you experience pain with clitoral stimulation?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Never" },
+                { "value": "1", "text": "Almost never" },
+                { "value": "0", "text": "Sometimes" },
+                { "value": "-1", "text": "Almost always" },
+                { "value": "-2", "text": "Always" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_uld_you_rate_the_int_v2_v2",
+              "title": "24. How would you rate the intensity of pain you experience with clitoral stimulation?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very low or absent" },
+                { "value": "1", "text": "Low" },
+                { "value": "0", "text": "Not too high, Not too low" },
+                { "value": "-1", "text": "High" },
+                { "value": "-2", "text": "Very high" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "hoften_do_you_experienc_v2_v2",
+              "title": "25. How often do you experience pain with arousal?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Never" },
+                { "value": "1", "text": "Almost never" },
+                { "value": "0", "text": "Sometimes" },
+                { "value": "-1", "text": "Almost always" },
+                { "value": "-2", "text": "Always" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "howould_you_rate_the_int_v2_v2",
+              "title": "26. How would you rate the intensity of pain you experience with arousal?",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very low or absent" },
+                { "value": "1", "text": "Low" },
+                { "value": "0", "text": "Not too high, Not too low" },
+                { "value": "-1", "text": "High" },
+                { "value": "-2", "text": "Very high" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "panel",
+          "name": "panel8",
+          "title": "Anatomy",
+          "elements": [
+            {
+              "type": "radiogroup",
+              "name": "how_wd_you_rate_the_sen_v2_v2",
+              "title": "27. How would you rate the sensitivity of your clitoris?  \n\n(sensitivity describes awareness of light touch)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very high" },
+                { "value": "1", "text": "High" },
+                { "value": "0", "text": "Not too high, Not too low" },
+                { "value": "-1", "text": "Low" },
+                { "value": "-2", "text": "Very low or absent" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_ssfied_are_you_with_v2_v2",
+              "title": "28. How satisfied are you with the sensitivity of your clitoris?  \n\n(sensitivity describes awareness of light touch)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "how_wod_you_rate_the_sen_v2_v2",
+              "title": "29. How would you rate the sensitivity of your labia majora (outer lips of the vulva)?   \n\n(sensitivity describes awareness of light touch)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very high" },
+                { "value": "1", "text": "High" },
+                { "value": "0", "text": "Not too high, Not too low" },
+                { "value": "-1", "text": "Low" },
+                { "value": "-2", "text": "Very low or absent" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "ied_are_you_with_v2_v2",
+              "title": "30. How satisfied are you with the sensitivity of your labia majora (outer lips of vulva)?  \n\n(sensitivity describes awareness of light touch)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "d_you_rate_the_sen_v2_v2",
+              "title": "31. How would you rate the sensitivity of your labia minora (inner lips of the vulva)?\n\n(sensitivity describes awareness of light touch)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very high" },
+                { "value": "1", "text": "High" },
+                { "value": "0", "text": "Not too high, Not too low" },
+                { "value": "-1", "text": "Low" },
+                { "value": "-2", "text": "Very low or absent" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "atisfied_are_you_with_v2_v2",
+              "title": "32. How satisfied are you with the sensitivity of your labia minora (inner lips of vulva)?\n\n(sensitivity describes awareness of light touch)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "daginal_penetration_v2_v2",
+              "visibleIf": "{do_you_currently_have_a_va_v2} = 1",
+              "title": "33. During vaginal penetration, how would you rate the sensitivity of your prostate (erectile tissue between bladder and rectum)?  \n\n(sensitivity describes awareness of touch/pressure)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very high" },
+                { "value": "1", "text": "High" },
+                { "value": "0", "text": "Not too high, Not too low" },
+                { "value": "-1", "text": "Low" },
+                { "value": "-2", "text": "Very low or absent" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "radiogroup",
+              "name": "during_vaginal_penetration_v2",
+              "visibleIf": "{do_you_currently_have_a_va_v2} = 1",
+              "title": "34. During vaginal penetration, how satisfied are you with the the sensitivity of your prostate (erectile tissue between bladder and rectum)? \n\n(sensitivity describes awareness of touch/pressure)",
+              "isRequired": true,
+              "choices": [
+                { "value": "2", "text": "Very satisfied" },
+                { "value": "1", "text": "Slightly satisfied" },
+                { "value": "0", "text": "Neither satisfied nor unsatisfied" },
+                { "value": "-1", "text": "Slightly unsatisfied" },
+                { "value": "-2", "text": "Very unsatisfied" },
+                { "value": "98", "text": "I don't know or Prefer not to answer" },
+                { "value": "99", "text": "N/A" }
+              ]
+            },
+            {
+              "type": "comment",
+              "name": "comment_v2_v3_v2_v2_v2",
+              "title": "Any comments or concerns? Please feel free to share any comments about your sexual journey."
+            },
+            {
+              "type": "html",
+              "name": "end_v2_v3_v2_v2_v2",
+              "html": "<p><strong><div class=\\\"rich-text-field-label\\\"><p><span style=\\\"font-weight: normal;\\\">If any of these questions have triggered distress for you, please feel free to reach out to a psychologist who specializes in gender dysphoria. </span><br><br><span style=\\\"font-weight: normal;\\\">Other resources: </span><br><span style=\\\"font-weight: normal;\\\">National Suicide Prevention Lifeline, call 1-800-273-8255 </span><br><span style=\\\"font-weight: normal;\\\">Crisis Text Line, text TALK to 741741</span><br><br><span style=\\\"font-weight: normal;\\\">THANK YOU!</span></p></div></strong></p>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "page11",
+      "title": "SatisFunction Scores",
+      "elements": [
+        {
+          "type": "html",
+          "name": "scores_table",
+          "html": "<p>Your scores reflect different aspects of your sexual satisfaction and function after vaginoplasty.</p><ul style='margin-left:20px; list-style-type:disc;'><li>Higher scores indicate greater satisfaction, comfort, or function.</li><li>Lower scores suggest areas where you may be experiencing difficulty.</li><li>The pain domain is scored so that higher values mean less pain.</li><li>Neutral / N/A / I don't know are scored as 0 and included in totals.</li></ul><table border='1' cellpadding='6' cellspacing='0' style='border-collapse:collapse;width:100%'><thead><tr><th>Domain</th><th>Score</th><th>Maximum</th></tr></thead><tbody><tr><td>Genital Self-Image</td><td>{genital_self_image_score_v2}</td><td>Max: 8</td></tr><tr><td>Sexual Desire</td><td>{desire_score_v2}</td><td>Max: 4</td></tr><tr><td>Arousal</td><td>{arousal_score_v2}</td><td>Max: 6</td></tr><tr><td>Lubrication</td><td>{lubrication_score_v2}</td><td>Max: 4</td></tr><tr><td>Orgasm</td><td>{orgasm_score_v2}</td><td>Max: 10 [8 if no vaginal canal]</td></tr><tr><td>Satisfaction</td><td>{satisfaction_score_v2}</td><td>Max: 8 [4 if no vaginal canal]</td></tr><tr><td>Pain</td><td>{pain_score_v2}</td><td>Max: 12 [8 if no vaginal canal]</td></tr><tr><td>Anatomy</td><td>{anatomy_score_v2}</td><td>Max: 16 [12 if no vaginal canal]</td></tr><tr><td><strong>Total SatisFunction Score</strong></td><td><strong>{total_satisfunction_score_v2}</strong></td><td><strong>Max: 68 [54 if no vaginal canal]</strong></td></tr></tbody></table><p style='margin-top:8px;font-style:italic'>If any item was skipped or marked Neutral/N/A/I don't know, it contributes 0 to the domain score.</p>"
+        },
+        {
+          "type": "expression",
+          "name": "genital_self_image_score_v2",
+          "visible": false,
+          "expression": "iif({how1_omfortable_are_you_wi_v2_v2} empty or {how1_omfortable_are_you_wi_v2_v2}='98' or {how1_omfortable_are_you_wi_v2_v2}='99', 0, {how1_omfortable_are_you_wi_v2_v2})\n+\niif({how2_cmfortable_do_you_or_v2_v2} empty or {how2_cmfortable_do_you_or_v2_v2}='98' or {how2_cmfortable_do_you_or_v2_v2}='99', 0, {how2_cmfortable_do_you_or_v2_v2})\n+\niif({how_often_does_scarring_in_v2} empty or {how_often_does_scarring_in_v2}='98' or {how_often_does_scarring_in_v2}='99', 0, {how_often_does_scarring_in_v2})\n+\niif({compared_to_before_your_pr_v2} empty or {compared_to_before_your_pr_v2}='98' or {compared_to_before_your_pr_v2}='99', 0, {compared_to_before_your_pr_v2})\n"
+        },
+        {
+          "type": "expression",
+          "name": "desire_score_v2",
+          "visible": false,
+          "expression": "iif({how_often_do_you_feel_sexu_v2} empty or {how_often_do_you_feel_sexu_v2}='98' or {how_often_do_you_feel_sexu_v2}='99', 0, {how_often_do_you_feel_sexu_v2})\n+\niif({ho_satisfied_are_you_with_v2_v2} empty or {ho_satisfied_are_you_with_v2_v2}='98' or {ho_satisfied_are_you_with_v2_v2}='99', 0, {ho_satisfied_are_you_with_v2_v2})\n"
+        },
+        {
+          "type": "expression",
+          "name": "arousal_score_v2",
+          "visible": false,
+          "expression": "iif({how_satified_are_you_with_v2_v2} empty or {how_satified_are_you_with_v2_v2}='98' or {how_satified_are_you_with_v2_v2}='99', 0, {how_satified_are_you_with_v2_v2})\n+\niif({how_woud_you_rate_the_int_v2_v2} empty or {how_woud_you_rate_the_int_v2_v2}='98' or {how_woud_you_rate_the_int_v2_v2}='99', 0, {how_woud_you_rate_the_int_v2_v2})\n+\niif({how_saisfied_are_you_with_v2_v2} empty or {how_saisfied_are_you_with_v2_v2}='98' or {how_saisfied_are_you_with_v2_v2}='99', 0, {how_saisfied_are_you_with_v2_v2})\n"
+        },
+        {
+          "type": "expression",
+          "name": "lubrication_score_v2",
+          "visible": false,
+          "expression": "iif({how_often_o_you_feel_secr_v2_v2} empty or {how_often_o_you_feel_secr_v2_v2}='98' or {how_often_o_you_feel_secr_v2_v2}='99', 0, {how_often_o_you_feel_secr_v2_v2})\n+\niif({how_oftn_do_you_feel_unwa_v2_v2} empty or {how_oftn_do_you_feel_unwa_v2_v2}='98' or {how_oftn_do_you_feel_unwa_v2_v2}='99', 0, {how_oftn_do_you_feel_unwa_v2_v2})\n"
+        },
+        {
+          "type": "expression",
+          "name": "orgasm_score_v2",
+          "visible": false,
+          "expression": "iif({how_ofen_have_you_been_ab_v2_v2} empty or {how_ofen_have_you_been_ab_v2_v2}='98' or {how_ofen_have_you_been_ab_v2_v2}='99', 0, {how_ofen_have_you_been_ab_v2_v2})\n+\niif({how_stisfied_do_you_feel_v2_v2} empty or {how_stisfied_do_you_feel_v2_v2}='98' or {how_stisfied_do_you_feel_v2_v2}='99', 0, {how_stisfied_do_you_feel_v2_v2})\n+\niif({do_you_currently_have_a_va_v2}='1',\n    iif({how_oftn_have_you_been_ab_v2_v2} empty or {how_oftn_have_you_been_ab_v2_v2}='98' or {how_oftn_have_you_been_ab_v2_v2}='99', 0, {how_oftn_have_you_been_ab_v2_v2}),\n    0)\n+\niif({how_otn_have_you_been_ab_v2_v2} empty or {how_otn_have_you_been_ab_v2_v2}='98' or {how_otn_have_you_been_ab_v2_v2}='99', 0, {how_otn_have_you_been_ab_v2_v2})\n+\niif({how_ofn_have_you_been_ab_v2_v2} empty or {how_ofn_have_you_been_ab_v2_v2}='98' or {how_ofn_have_you_been_ab_v2_v2}='99', 0, {how_ofn_have_you_been_ab_v2_v2})\n"
+        },
+        {
+          "type": "expression",
+          "name": "satisfaction_score_v2",
+          "visible": false,
+          "expression": "iif({how_stisfied_are_you_with_v2_v2} empty or {how_stisfied_are_you_with_v2_v2}='98' or {how_stisfied_are_you_with_v2_v2}='99', 0, {how_stisfied_are_you_with_v2_v2})\n+\niif({do_you_currently_have_a_va_v2}='1',\n    iif({how_sisfied_are_you_with_v2_v2} empty or {how_sisfied_are_you_with_v2_v2}='98' or {how_sisfied_are_you_with_v2_v2}='99', 0, {how_sisfied_are_you_with_v2_v2}),\n    0)\n+\niif({do_you_currently_have_a_va_v2}='1',\n    iif({how_stfied_are_you_with_v2_v2} empty or {how_stfied_are_you_with_v2_v2}='98' or {how_stfied_are_you_with_v2_v2}='99', 0, {how_stfied_are_you_with_v2_v2}),\n    0)\n+\niif({how_safied_are_you_with_v2_v2} empty or {how_safied_are_you_with_v2_v2}='98' or {how_safied_are_you_with_v2_v2}='99', 0, {how_safied_are_you_with_v2_v2})\n"
+        },
+        {
+          "type": "expression",
+          "name": "pain_score_v2",
+          "visible": false,
+          "expression": "iif({do_you_currently_have_a_va_v2}='1',\n    iif({how_ofn_do_you_experienc_v2_v2} empty or {how_ofn_do_you_experienc_v2_v2}='98' or {how_ofn_do_you_experienc_v2_v2}='99', 0, {how_ofn_do_you_experienc_v2_v2}),\n    0)\n+\niif({do_you_currently_have_a_va_v2}='1',\n    iif({how_wld_you_rate_the_int_v2_v2} empty or {how_wld_you_rate_the_int_v2_v2}='98' or {how_wld_you_rate_the_int_v2_v2}='99', 0, {how_wld_you_rate_the_int_v2_v2}),\n    0)\n+\niif({how_on_do_you_experienc_v2_v2} empty or {how_on_do_you_experienc_v2_v2}='98' or {how_on_do_you_experienc_v2_v2}='99', 0, {how_on_do_you_experienc_v2_v2})\n+\niif({how_uld_you_rate_the_int_v2_v2} empty or {how_uld_you_rate_the_int_v2_v2}='98' or {how_uld_you_rate_the_int_v2_v2}='99', 0, {how_uld_you_rate_the_int_v2_v2})\n+\niif({hoften_do_you_experienc_v2_v2} empty or {hoften_do_you_experienc_v2_v2}='98' or {hoften_do_you_experienc_v2_v2}='99', 0, {hoften_do_you_experienc_v2_v2})\n+\niif({howould_you_rate_the_int_v2_v2} empty or {howould_you_rate_the_int_v2_v2}='98' or {howould_you_rate_the_int_v2_v2}='99', 0, {howould_you_rate_the_int_v2_v2})\n"
+        },
+        {
+          "type": "expression",
+          "name": "anatomy_score_v2",
+          "visible": false,
+          "expression": "iif({how_wd_you_rate_the_sen_v2_v2} empty or {how_wd_you_rate_the_sen_v2_v2}='98' or {how_wd_you_rate_the_sen_v2_v2}='99', 0, {how_wd_you_rate_the_sen_v2_v2})\n+\niif({how_ssfied_are_you_with_v2_v2} empty or {how_ssfied_are_you_with_v2_v2}='98' or {how_ssfied_are_you_with_v2_v2}='99', 0, {how_ssfied_are_you_with_v2_v2})\n+\niif({how_wod_you_rate_the_sen_v2_v2} empty or {how_wod_you_rate_the_sen_v2_v2}='98' or {how_wod_you_rate_the_sen_v2_v2}='99', 0, {how_wod_you_rate_the_sen_v2_v2})\n+\niif({ied_are_you_with_v2_v2} empty or {ied_are_you_with_v2_v2}='98' or {ied_are_you_with_v2_v2}='99', 0, {ied_are_you_with_v2_v2})\n+\niif({d_you_rate_the_sen_v2_v2} empty or {d_you_rate_the_sen_v2_v2}='98' or {d_you_rate_the_sen_v2_v2}='99', 0, {d_you_rate_the_sen_v2_v2})\n+\niif({atisfied_are_you_with_v2_v2} empty or {atisfied_are_you_with_v2_v2}='98' or {atisfied_are_you_with_v2_v2}='99', 0, {atisfied_are_you_with_v2_v2})\n+\niif({do_you_currently_have_a_va_v2}='1',\n    iif({daginal_penetration_v2_v2} empty or {daginal_penetration_v2_v2}='98' or {daginal_penetration_v2_v2}='99', 0, {daginal_penetration_v2_v2}),\n    0)\n+\niif({do_you_currently_have_a_va_v2}='1',\n    iif({during_vaginal_penetration_v2} empty or {during_vaginal_penetration_v2}='98' or {during_vaginal_penetration_v2}='99', 0, {during_vaginal_penetration_v2}),\n    0)\n"
+        },
+        {
+          "type": "expression",
+          "name": "total_satisfunction_score_v2",
+          "visible": false,
+          "expression": "{genital_self_image_score_v2}\n+ {desire_score_v2}\n+ {arousal_score_v2}\n+ {lubrication_score_v2}\n+ {orgasm_score_v2}\n+ {satisfaction_score_v2}\n+ {pain_score_v2}\n+ {anatomy_score_v2}\n"
+        }
+      ]
+    }
+  ],
+  "calculatedValues": [
+    { "name": "has_vaginal_canal", "expression": "{do_you_currently_have_a_va_v2} = 1" },
+    { "name": "gsi_max_display", "expression": "8" },
+    { "name": "desire_max_display", "expression": "4" },
+    { "name": "arousal_max_display", "expression": "6" },
+    { "name": "lube_max_display", "expression": "4" },
+    { "name": "orgasm_max_display", "expression": "iif({has_vaginal_canal}, 10, 8)" },
+    { "name": "satisfaction_max_display", "expression": "iif({has_vaginal_canal}, 8, 4)" },
+    { "name": "pain_max_display", "expression": "iif({has_vaginal_canal}, 12, 8)" },
+    { "name": "anatomy_max_display", "expression": "iif({has_vaginal_canal}, 16, 12)" },
+    { "name": "total_max_display", "expression": "iif({has_vaginal_canal}, 68, 54)" },
+    { "name": "total_satisfunction_score", "expression": "{genital_self_image_score_v2} + {desire_score_v2} + {arousal_score_v2} + {lubrication_score_v2} + {orgasm_score_v2} + {satisfaction_score_v2} + {pain_score_v2} + {anatomy_score_v2}" }
+  ]
+};
+
+    // ============ BOOTSTRAP ============
+    function start() {
+      // If libs failed, show a clear error
       if (!window.Survey || !Survey.Model) {
-        err.textContent = "SurveyJS failed to load. (Check the <script src> URL.)";
+        const err = document.getElementById("err");
+        err.textContent = "SurveyJS failed to load. Check the <script src> URLs.";
         err.style.display = "block";
         return;
       }
 
-      Survey.StylesManager.applyTheme("defaultV2");
-
-      // Minimal test survey: ONE text box.
-      const surveyJson = {
-        title: "Test SurveyJS",
-        elements: [
-          { type: "text", name: "name", title: "If you can see this input, SurveyJS works." }
-        ]
-      };
+      // If private, ask for code (or allow via ?code=)
+      if (PASSCODE) {
+        const supplied = params.get("code") || prompt("Enter access code");
+        if (supplied !== PASSCODE) {
+          const err = document.getElementById("err");
+          err.textContent = "Incorrect access code.";
+          err.style.display = "block";
+          return;
+        }
+      }
 
       const survey = new Survey.Model(surveyJson);
+
+      // Stamp a site tag into results even if there isn't a visible "site" question
+      if (siteTag) {
+        try { survey.setValue("site", siteTag); } catch (_) {}
+      }
+
+      // Let the respondent download their answers when done
+      survey.onComplete.add((sender) => {
+        const data = { ...sender.data };
+        if (siteTag && !("site" in data)) data.site = siteTag;
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "satisfunction-survey-response.json";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+
+      // Render!
       survey.render("surveyContainer");
-    });
+    }
+
+    start();
   </script>
 </body>
 </html>
