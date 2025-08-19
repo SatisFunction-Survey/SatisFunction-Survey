@@ -1,47 +1,41 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SatisFunction Survey</title>
 
-  <!-- SurveyJS (Knockout UI) -->
-  <link href="https://unpkg.com/survey-core/defaultV2.min.css" rel="stylesheet" />
-  <script src="https://unpkg.com/survey-core/survey.core.min.js"></script>
-  <script src="https://unpkg.com/survey-knockout-ui/survey-knockout-ui.min.js"></script>
+  <!-- SurveyJS runtime (one CSS + one JS) -->
+  <link rel="stylesheet" href="https://unpkg.com/survey-core/defaultV2.min.css">
+  <script src="https://unpkg.com/survey-core/survey.core.iife.min.js"></script>
 
   <style>
-    body { max-width: 960px; margin: 0 auto; padding: 24px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    #surveyContainer { margin-top: 8px; }
-    .gate { display: none; border: 1px solid #ddd; border-radius: 10px; padding: 18px; margin-top: 12px; }
-    .gate.active { display: block; }
-    .gate input { padding: 10px; font-size: 16px; width: 220px; }
-    .gate button { padding: 10px 14px; font-size: 16px; margin-left: 8px; cursor: pointer; }
-    .err { color: #b00020; display: none; margin-top: 8px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f6f2e8; margin:0; }
+    .wrap { max-width: 900px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 2rem; margin: 0 0 20px; }
+    #err { color:#b00020; margin: 12px 0 0; display:none; }
   </style>
 </head>
 <body>
-  <h1>SatisFunction Survey</h1>
-
-  <!-- Soft access gate (toggle with PASSCODE below) -->
-  <div id="gate" class="gate">
-    <p>This survey requires an access code.</p>
-    <input id="code" type="password" placeholder="Access code" />
-    <button id="enter">Enter</button>
-    <div id="errmsg" class="err">Incorrect code</div>
+  <div class="wrap">
+    <h1>SatisFunction Survey</h1>
+    <div id="err"></div>
+    <div id="surveyContainer"></div>
   </div>
 
-  <div id="surveyContainer"></div>
-
   <script>
+    // Theme
     Survey.StylesManager.applyTheme("defaultV2");
 
-    /* ====== PUBLIC / PRIVATE TOGGLE ======
-       Set PASSCODE to ""  -> public (no prompt)
-       Set PASSCODE to "something" -> private (asks for that code)
-    */
-    const PASSCODE = "POPE2025"
-    */
+    // ====== PUBLIC / PRIVATE toggle ======
+    // Set to "" for public (no prompt). Set to any non-empty string for private.
+    const PASSCODE = ""; // e.g. "AUGS2025" to require a code
+
+    // Optional per-site tag: use URL like ?site=ClinicA
+    const params   = new URLSearchParams(location.search);
+    const siteTag  = params.get("site") || "";
+
+    // ====== PASTE YOUR SURVEY JSON BELOW ======
     const surveyJson = {
   "title": "SatisFunction Survey ",
   "description": "Sexual Function and Satisfaction Post-Vaginoplasty\n\nPurpose:\nThis survey helps you (and your clinician) understand your current sexual function and satisfaction after surgery or other treatments. It is not a research study-your responses are used only to guide your care.\n\nHow to Complete:\n- Answer each question based on your experiences in the past 4 weeks.\n- Select the answer that best matches your experience or feelings.\n- If a question does not apply to you (for example, if you do not have a vaginal canal), choose \"N/A\".\n- If you are unsure or prefer not to answer a question, choose \"I don't know / Prefer not to answer\".\n\nThere are no right or wrong answers-please answer honestly.\n\nScoring:\nYour responses are scored to help identify areas where you may be experiencing challenges or improvements. A higher score generally reflects better sexual function and satisfaction. Your clinician will review the results with you.\n\nPrivacy:\nYour answers are confidential and are not stored in a research database. Results are for your clinical care only.",
@@ -1595,47 +1589,46 @@
       "expression": "{genital_self_image_score_v2} + {desire_score_v2} + {arousal_score_v2} + {lubrication_score_v2} + {orgasm_score_v2} + {satisfaction_score_v2} + {pain_score_v2} + {anatomy_score_v2}"
     }
   ]
-} ;
+};
+    // ==========================================
 
-    // Optional: capture ?site=ClinicA for per-site tracking
-    const params = new URLSearchParams(location.search);
-    const siteParam = params.get("site") || "";
+    function start() {
+      // If private, ask for code (or allow via ?code=)
+      if (PASSCODE) {
+        const supplied = params.get("code") || prompt("Enter access code");
+        if (supplied !== PASSCODE) {
+          const err = document.getElementById("err");
+          err.textContent = "Incorrect access code.";
+          err.style.display = "block";
+          return; // stop; don’t render the survey
+        }
+      }
 
-    function startSurvey() {
       const survey = new Survey.Model(surveyJson);
 
-      // Stamp site into the result even if no visible question for it
-      if (siteParam) survey.setValue("site", siteParam);
+      // Stamp a site tag into results even if there isn't a visible "site" question
+      if (siteTag) {
+        try { survey.setValue("site", siteTag); } catch (_) {}
+      }
 
-      // On complete: let the respondent download their answers (remove if you post to a backend)
-      survey.onComplete.add(function(sender) {
-        const data = sender.data;
-        const filename = `satisfunction_response_${Date.now()}.json`;
+      // Let the respondent download their answers when done (remove if you’ll post to a backend)
+      survey.onComplete.add((sender) => {
+        const data = { ...sender.data };
+        if (siteTag && !("site" in data)) data.site = siteTag;
+
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = url; a.download = filename; a.click();
-        URL.revokeObjectURL(url);
+        a.href = URL.createObjectURL(blob);
+        a.download = "satisfunction-survey-response.json";
+        a.click();
+        URL.revokeObjectURL(a.href);
       });
 
-      survey.render(document.getElementById("surveyContainer"));
+      // Render!
+      survey.render("surveyContainer");
     }
 
-    // Handle public/private gate
-    if (PASSCODE) {
-      const gate = document.getElementById("gate");
-      gate.classList.add("active");
-      document.getElementById("enter").addEventListener("click", () => {
-        if (document.getElementById("code").value === PASSCODE) {
-          gate.remove();
-          startSurvey();
-        } else {
-          document.getElementById("errmsg").style.display = "block";
-        }
-      });
-    } else {
-      startSurvey();
-    }
+    start();
   </script>
 </body>
 </html>
